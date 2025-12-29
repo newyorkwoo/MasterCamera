@@ -24,13 +24,33 @@ class CameraService: NSObject, ObservableObject {
     @Published var currentEV: Double = 0
     @Published var suggestedParameter: ExposureParameter?
     
-    var minISO: Float = 50
-    var maxISO: Float = 3200
+    // 標準 ISO 值（基於真實底片規格）
+    let standardISOValues: [Float] = [
+        25, 50, 64, 100, 125, 160, 200, 250, 320, 400, 
+        500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 
+        4000, 5000, 6400, 8000, 10000, 12800
+    ]
+    
+    var minISO: Float = 25
+    var maxISO: Float = 12800
     var minShutterSpeed: Double = 0.0001 // 1/10000
     var maxShutterSpeed: Double = 1.0 // 1秒
     
     enum ExposureParameter {
         case iso, shutter, aperture
+    }
+    
+    // 取得最接近的標準 ISO 值
+    func nearestStandardISO(_ value: Float) -> Float {
+        let deviceMin = minISO
+        let deviceMax = maxISO
+        
+        // 過濾出設備支持的 ISO 值
+        let supportedISO = standardISOValues.filter { $0 >= deviceMin && $0 <= deviceMax }
+        
+        guard !supportedISO.isEmpty else { return value }
+        
+        return supportedISO.min(by: { abs($0 - value) < abs($1 - value) }) ?? value
     }
     
     var shutterSpeedText: String {
@@ -268,6 +288,14 @@ class CameraService: NSObject, ObservableObject {
     func updateExposure(changedParameter: ExposureParameter) {
         guard let device = deviceInput?.device else { return }
         
+        // 將 ISO 調整為最接近的標準值
+        let standardISO = nearestStandardISO(currentISO)
+        if standardISO != currentISO {
+            DispatchQueue.main.async {
+                self.currentISO = standardISO
+            }
+        }
+        
         // 計算當前曝光值 (EV)
         calculateEV()
         
@@ -313,7 +341,7 @@ class CameraService: NSObject, ObservableObject {
         // 曝光值計算公式: EV = log2(N² / t) - log2(S / 100)
         // N = 光圈數, t = 快門時間(秒), S = ISO
         let apertureSquared = currentAperture * currentAperture
-        let ev = log2(apertureSquared / currentShutterSpeed) - log2(currentISO / 100.0)
+        let ev = log2(apertureSquared / currentShutterSpeed) - log2(Double(currentISO) / 100.0)
         currentEV = ev
     }
     

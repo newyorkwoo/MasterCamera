@@ -50,7 +50,7 @@ struct ManualControlsView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
                     Spacer()
-                    Text("\(Int(cameraService.currentISO))")
+                    Text("\(Int(cameraService.nearestStandardISO(cameraService.currentISO)))")
                         .font(.system(size: 14))
                         .foregroundColor(.yellow)
                 }
@@ -63,6 +63,18 @@ struct ManualControlsView: View {
                     }
                 })
                 .accentColor(.yellow)
+                
+                // 標準 ISO 刻度標記
+                HStack {
+                    ForEach([50, 100, 200, 400, 800, 1600, 3200, 6400], id: \.self) { iso in
+                        if Float(iso) >= cameraService.minISO && Float(iso) <= cameraService.maxISO {
+                            Text("\(iso)")
+                                .font(.system(size: 8))
+                                .foregroundColor(.white.opacity(0.5))
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                }
             }
             
             // 快門速度控制
