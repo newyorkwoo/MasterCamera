@@ -14,8 +14,9 @@ struct MasterCameraApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            CameraView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                .preferredColorScheme(.dark)
         }
     }
 }
