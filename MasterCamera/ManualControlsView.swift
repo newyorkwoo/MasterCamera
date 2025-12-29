@@ -10,6 +10,32 @@ import SwiftUI
 struct ManualControlsView: View {
     @ObservedObject var cameraService: CameraService
     @State private var showControls = false
+    @State private var selectedISOIndex = 7 // 預設 ISO 100
+    @State private var selectedShutterIndex = 15 // 預設 1/125
+    @State private var selectedApertureIndex = 5 // 預設 f/2.8
+    
+    // 快門速度選項
+    let shutterSpeeds: [(value: Double, display: String)] = [
+        (1.0, "1\""),
+        (0.5, "1/2"),
+        (0.25, "1/4"),
+        (0.125, "1/8"),
+        (1.0/15, "1/15"),
+        (1.0/30, "1/30"),
+        (1.0/60, "1/60"),
+        (1.0/125, "1/125"),
+        (1.0/250, "1/250"),
+        (1.0/500, "1/500"),
+        (1.0/1000, "1/1000"),
+        (1.0/2000, "1/2000"),
+        (1.0/4000, "1/4000"),
+        (1.0/8000, "1/8000")
+    ]
+    
+    // 光圈選項
+    let apertures: [Double] = [
+        1.4, 1.8, 2.0, 2.8, 4.0, 5.6, 8.0, 11, 16, 22
+    ]
     
     var body: some View {
         VStack {
@@ -42,51 +68,38 @@ struct ManualControlsView: View {
     }
     
     private var controlsPanel: some View {
-        VStack(spacing: 15) {
-            // ISO 控制
+        HStack(spacing: 20) {
+            // ISO 滾輪
             VStack(spacing: 5) {
-                HStack {
-                    Text("ISO")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
-                    Spacer()
-                    Text("\(Int(cameraService.nearestStandardISO(cameraService.currentISO)))")
-                        .font(.system(size: 14))
-                        .foregroundColor(.yellow)
-                }
+                Text("ISO")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
                 
-                Slider(value: $cameraService.currentISO,
-                       in: cameraService.minISO...cameraService.maxISO,
-                       onEditingChanged: { editing in
-                    if !editing {
-                        cameraService.updateExposure(changedParameter: .iso)
-                    }
-                })
-                .accentColor(.yellow)
-                
-                // 標準 ISO 刻度標記
-                HStack {
-                    ForEach([50, 100, 200, 400, 800, 1600, 3200, 6400], id: \.self) { iso in
-                        if Float(iso) >= cameraService.minISO && Float(iso) <= cameraService.maxISO {
-                            Text("\(iso)")
-                                .font(.system(size: 8))
-                                .foregroundColor(.white.opacity(0.5))
-                                .frame(maxWidth: .infinity)
+                Picker("ISO", selection: $selectedISOIndex) {
+                    ForEach(0..<cameraService.standardISOValues.count, id: \.self) { index in
+                        let iso = cameraService.standardISOValues[index]
+                        if iso >= cameraService.minISO && iso <= cameraService.maxISO {
+                            Text("\(Int(iso))")
+                                .foregroundColor(.yellow)
+                                .tag(index)
                         }
                     }
                 }
+                .pickerStyle(.wheel)
+                .frame(height: 150)
+                .clipped()
+                .onChange(of: selectedISOIndex) { _ in
+                    updateISO()
+                }
             }
+            .frame(maxWidth: .infinity)
             
-            // 快門速度控制
+            // 快門速度滾輪
             VStack(spacing: 5) {
                 HStack {
                     Text("快門")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
-                    Spacer()
-                    Text(cameraService.shutterSpeedText)
-                        .font(.system(size: 14))
-                        .foregroundColor(.yellow)
                     if cameraService.suggestedParameter == .shutter {
                         Text("(建議)")
                             .font(.system(size: 10))
@@ -94,26 +107,28 @@ struct ManualControlsView: View {
                     }
                 }
                 
-                Slider(value: $cameraService.currentShutterSpeed,
-                       in: cameraService.minShutterSpeed...cameraService.maxShutterSpeed,
-                       onEditingChanged: { editing in
-                    if !editing {
-                        cameraService.updateExposure(changedParameter: .shutter)
+                Picker("快門", selection: $selectedShutterIndex) {
+                    ForEach(0..<shutterSpeeds.count, id: \.self) { index in
+                        Text(shutterSpeeds[index].display)
+                            .foregroundColor(.yellow)
+                            .tag(index)
                     }
-                })
-                .accentColor(.yellow)
+                }
+                .pickerStyle(.wheel)
+                .frame(height: 150)
+                .clipped()
+                .onChange(of: selectedShutterIndex) { _ in
+                    updateShutter()
+                }
             }
+            .frame(maxWidth: .infinity)
             
-            // 光圈控制（模擬）
+            // 光圈滾輪
             VStack(spacing: 5) {
                 HStack {
                     Text("光圈")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
-                    Spacer()
-                    Text("f/\(String(format: "%.1f", cameraService.currentAperture))")
-                        .font(.system(size: 14))
-                        .foregroundColor(.yellow)
                     if cameraService.suggestedParameter == .aperture {
                         Text("(建議)")
                             .font(.system(size: 10))
@@ -121,17 +136,25 @@ struct ManualControlsView: View {
                     }
                 }
                 
-                Slider(value: $cameraService.currentAperture,
-                       in: 1.4...22.0,
-                       step: 0.1,
-                       onEditingChanged: { editing in
-                    if !editing {
-                        cameraService.updateExposure(changedParameter: .aperture)
+                Picker("光圈", selection: $selectedApertureIndex) {
+                    ForEach(0..<apertures.count, id: \.self) { index in
+                        Text("f/\(String(format: "%.1f", apertures[index]))")
+                            .foregroundColor(.yellow)
+                            .tag(index)
                     }
-                })
-                .accentColor(.yellow)
+                }
+                .pickerStyle(.wheel)
+                .frame(height: 150)
+                .clipped()
+                .onChange(of: selectedApertureIndex) { _ in
+                    updateAperture()
+                }
             }
-            
+            .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal, 10)
+        
+        VStack(spacing: 10) {
             // 曝光值顯示
             HStack {
                 Text("曝光值 (EV)")
@@ -142,9 +165,11 @@ struct ManualControlsView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white)
             }
+            .padding(.horizontal)
             
             // 重置按鈕
             Button(action: {
+                resetToDefaults()
                 cameraService.resetToAuto()
             }) {
                 Text("自動模式")
@@ -155,13 +180,36 @@ struct ManualControlsView: View {
                     .background(Color.blue.opacity(0.6))
                     .cornerRadius(8)
             }
+            .padding(.horizontal)
         }
-        .padding()
+        .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 15)
                 .fill(Color.black.opacity(0.8))
         )
         .padding(.horizontal)
         .padding(.bottom, 10)
+    }
+    
+    private func updateISO() {
+        let iso = cameraService.standardISOValues[selectedISOIndex]
+        cameraService.currentISO = iso
+        cameraService.updateExposure(changedParameter: .iso)
+    }
+    
+    private func updateShutter() {
+        cameraService.currentShutterSpeed = shutterSpeeds[selectedShutterIndex].value
+        cameraService.updateExposure(changedParameter: .shutter)
+    }
+    
+    private func updateAperture() {
+        cameraService.currentAperture = apertures[selectedApertureIndex]
+        cameraService.updateExposure(changedParameter: .aperture)
+    }
+    
+    private func resetToDefaults() {
+        selectedISOIndex = 7 // ISO 100
+        selectedShutterIndex = 7 // 1/125
+        selectedApertureIndex = 3 // f/2.8
     }
 }
