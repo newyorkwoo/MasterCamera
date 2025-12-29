@@ -17,6 +17,30 @@ class CameraService: NSObject, ObservableObject {
     @Published var isFrontCamera = false
     @Published var zoomFactor: CGFloat = 1.0
     
+    // 手動曝光控制
+    @Published var currentISO: Float = 100
+    @Published var currentShutterSpeed: Double = 0.01 // 秒
+    @Published var currentAperture: Double = 1.8
+    @Published var currentEV: Double = 0
+    @Published var suggestedParameter: ExposureParameter?
+    
+    var minISO: Float = 50
+    var maxISO: Float = 3200
+    var minShutterSpeed: Double = 0.0001 // 1/10000
+    var maxShutterSpeed: Double = 1.0 // 1秒
+    
+    enum ExposureParameter {
+        case iso, shutter, aperture
+    }
+    
+    var shutterSpeedText: String {
+        if currentShutterSpeed >= 1.0 {
+            return String(format: "%.1f\"", currentShutterSpeed)
+        } else {
+            return "1/\(Int(1.0 / currentShutterSpeed))"
+        }
+    }
+    
     let session = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
     private var deviceInput: AVCaptureDeviceInput?
@@ -112,6 +136,9 @@ class CameraService: NSObject, ObservableObject {
             }
             
             session.commitConfiguration()
+            
+            // 設置手動控制的範圍
+            setupManualControls()
             
         } catch {
             self.error = .cameraUnavailable
@@ -234,6 +261,106 @@ class CameraService: NSObject, ObservableObject {
     func getMaxZoom() -> CGFloat {
         guard let device = deviceInput?.device else { return 1.0 }
         return min(device.activeFormat.videoMaxZoomFactor, 10.0)
+    }
+    
+    // MARK: - 手動曝光控制
+    
+    func updateExposure(changedParameter: ExposureParameter) {
+        guard let device = deviceInput?.device else { return }
+        
+        // 計算當前曝光值 (EV)
+        calculateEV()
+        
+        do {
+            try device.lockForConfiguration()
+            
+            // 設置手動曝光模式
+            if device.isExposureModeSupported(.custom) {
+                // 轉換快門速度為 CMTime
+                let shutterDuration = CMTime(seconds: currentShutterSpeed, preferredTimescale: 1000000000)
+                
+                // 根據哪個參數被改變，建議另一個參數
+                switch changedParameter {
+                case .iso:
+                    // ISO 改變，建議快門速度
+                    suggestedParameter = .shutter
+                    // 可以在這裡計算建議的快門速度
+                    
+                case .shutter:
+                    // 快門改變，建議光圈
+                    suggestedParameter = .aperture
+                    // 計算建議的光圈值
+                    
+                case .aperture:
+                    // 光圈改變，建議 ISO
+                    suggestedParameter = .iso
+                    // 計算建議的 ISO 值
+                }
+                
+                // 應用 ISO 和快門設置
+                device.setExposureModeCustom(duration: shutterDuration,
+                                            iso: currentISO,
+                                            completionHandler: nil)
+            }
+            
+            device.unlockForConfiguration()
+        } catch {
+            print("Error setting exposure: \\(error)")
+        }
+    }
+    
+    func calculateEV() {
+        // 曝光值計算公式: EV = log2(N² / t) - log2(S / 100)
+        // N = 光圈數, t = 快門時間(秒), S = ISO
+        let apertureSquared = currentAperture * currentAperture
+        let ev = log2(apertureSquared / currentShutterSpeed) - log2(currentISO / 100.0)
+        currentEV = ev
+    }
+    
+    func resetToAuto() {
+        guard let device = deviceInput?.device else { return }
+        
+        do {
+            try device.lockForConfiguration()
+            
+            if device.isExposureModeSupported(.continuousAutoExposure) {
+                device.exposureMode = .continuousAutoExposure
+            }
+            
+            device.unlockForConfiguration()
+            
+            // 重置為默認值
+            DispatchQueue.main.async {
+                self.currentISO = 100
+                self.currentShutterSpeed = 0.01
+                self.currentAperture = 1.8
+                self.suggestedParameter = nil
+                self.calculateEV()
+            }
+        } catch {
+            print("Error resetting to auto: \\(error)")
+        }
+    }
+    
+    func setupManualControls() {
+        guard let device = deviceInput?.device else { return }
+        
+        // 獲取設備支持的 ISO 範圍
+        minISO = device.activeFormat.minISO
+        maxISO = device.activeFormat.maxISO
+        
+        // 獲取設備支持的快門速度範圍
+        let minDuration = device.activeFormat.minExposureDuration
+        let maxDuration = device.activeFormat.maxExposureDuration
+        
+        minShutterSpeed = CMTimeGetSeconds(minDuration)
+        maxShutterSpeed = min(CMTimeGetSeconds(maxDuration), 1.0)
+        
+        // 初始化當前值
+        currentISO = 100
+        currentShutterSpeed = 0.01
+        currentAperture = 1.8
+        calculateEV()
     }
 }
 

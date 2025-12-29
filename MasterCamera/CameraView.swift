@@ -74,6 +74,9 @@ struct CameraView: View {
                     
                     Spacer()
                     
+                    // 手動控制面板
+                    ManualControlsView(cameraService: cameraService)
+                    
                     // 底部控制列
                     bottomControlsBar
                 }
