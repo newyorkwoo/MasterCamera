@@ -68,93 +68,94 @@ struct ManualControlsView: View {
     }
     
     private var controlsPanel: some View {
-        HStack(spacing: 20) {
-            // ISO 滾輪
-            VStack(spacing: 5) {
-                Text("ISO")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+        VStack(spacing: 15) {
+            // 三個滾輪並排
+            HStack(spacing: 20) {
+                // ISO 滾輪
+                VStack(spacing: 5) {
+                    Text("ISO")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
                 
-                Picker("ISO", selection: $selectedISOIndex) {
-                    ForEach(0..<cameraService.standardISOValues.count, id: \.self) { index in
-                        let iso = cameraService.standardISOValues[index]
-                        if iso >= cameraService.minISO && iso <= cameraService.maxISO {
-                            Text("\(Int(iso))")
+                    Picker("ISO", selection: $selectedISOIndex) {
+                        ForEach(0..<cameraService.standardISOValues.count, id: \.self) { index in
+                            let iso = cameraService.standardISOValues[index]
+                            if iso >= cameraService.minISO && iso <= cameraService.maxISO {
+                                Text("\(Int(iso))")
+                                    .foregroundColor(.yellow)
+                                    .tag(index)
+                            }
+                        }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(height: 150)
+                    .clipped()
+                    .onChange(of: selectedISOIndex) { _ in
+                        updateISO()
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                
+                // 快門速度滾輪
+                VStack(spacing: 5) {
+                    HStack {
+                        Text("快門")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                        if cameraService.suggestedParameter == .shutter {
+                            Text("(建議)")
+                                .font(.system(size: 10))
+                                .foregroundColor(.green)
+                        }
+                    }
+                    
+                    Picker("快門", selection: $selectedShutterIndex) {
+                        ForEach(0..<shutterSpeeds.count, id: \.self) { index in
+                            Text(shutterSpeeds[index].display)
                                 .foregroundColor(.yellow)
                                 .tag(index)
                         }
                     }
-                }
-                .pickerStyle(.wheel)
-                .frame(height: 150)
-                .clipped()
-                .onChange(of: selectedISOIndex) { _ in
-                    updateISO()
-                }
-            }
-            .frame(maxWidth: .infinity)
-            
-            // 快門速度滾輪
-            VStack(spacing: 5) {
-                HStack {
-                    Text("快門")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
-                    if cameraService.suggestedParameter == .shutter {
-                        Text("(建議)")
-                            .font(.system(size: 10))
-                            .foregroundColor(.green)
+                    .pickerStyle(.wheel)
+                    .frame(height: 150)
+                    .clipped()
+                    .onChange(of: selectedShutterIndex) { _ in
+                        updateShutter()
                     }
                 }
+                .frame(maxWidth: .infinity)
                 
-                Picker("快門", selection: $selectedShutterIndex) {
-                    ForEach(0..<shutterSpeeds.count, id: \.self) { index in
-                        Text(shutterSpeeds[index].display)
-                            .foregroundColor(.yellow)
-                            .tag(index)
+                // 光圈滾輪
+                VStack(spacing: 5) {
+                    HStack {
+                        Text("光圈")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                        if cameraService.suggestedParameter == .aperture {
+                            Text("(建議)")
+                                .font(.system(size: 10))
+                                .foregroundColor(.green)
+                        }
+                    }
+                    
+                    Picker("光圈", selection: $selectedApertureIndex) {
+                        ForEach(0..<apertures.count, id: \.self) { index in
+                            Text("f/\(String(format: "%.1f", apertures[index]))")
+                                .foregroundColor(.yellow)
+                                .tag(index)
+                        }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(height: 150)
+                    .clipped()
+                    .onChange(of: selectedApertureIndex) { _ in
+                        updateAperture()
                     }
                 }
-                .pickerStyle(.wheel)
-                .frame(height: 150)
-                .clipped()
-                .onChange(of: selectedShutterIndex) { _ in
-                    updateShutter()
-                }
+                .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 10)
             
-            // 光圈滾輪
-            VStack(spacing: 5) {
-                HStack {
-                    Text("光圈")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
-                    if cameraService.suggestedParameter == .aperture {
-                        Text("(建議)")
-                            .font(.system(size: 10))
-                            .foregroundColor(.green)
-                    }
-                }
-                
-                Picker("光圈", selection: $selectedApertureIndex) {
-                    ForEach(0..<apertures.count, id: \.self) { index in
-                        Text("f/\(String(format: "%.1f", apertures[index]))")
-                            .foregroundColor(.yellow)
-                            .tag(index)
-                    }
-                }
-                .pickerStyle(.wheel)
-                .frame(height: 150)
-                .clipped()
-                .onChange(of: selectedApertureIndex) { _ in
-                    updateAperture()
-                }
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .padding(.horizontal, 10)
-        
-        VStack(spacing: 10) {
             // 曝光值顯示
             HStack {
                 Text("曝光值 (EV)")
